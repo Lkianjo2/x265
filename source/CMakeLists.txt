@@ -85,7 +85,10 @@ else()
 endif()
 
 if(UNIX)
-    list(APPEND PLATFORM_LIBS pthread)
+    find_library(LIBPTHREAD pthread)
+    if(LIBPTHREAD)
+        list(APPEND PLATFORM_LIBS pthread)
+    endif()
     find_library(LIBRT rt)
     if(LIBRT)
         list(APPEND PLATFORM_LIBS rt)
@@ -245,6 +248,7 @@ if(GCC)
             set(ARM_ARGS -march=armv6 -mfloat-abi=soft -mfpu=vfp -marm -fPIC)
         endif()
         message(STATUS "cross compile arm")
+	message(ARM_ARGS ${ARM_ARGS})
     elseif(ARM)
         if(ARM64)
             set(ARM_ARGS -fPIC)
@@ -715,6 +719,11 @@ if(X265_LATEST_TAG)
     install(FILES       "${CMAKE_CURRENT_BINARY_DIR}/x265.pc"
             DESTINATION "${LIB_INSTALL_DIR}/pkgconfig")
 endif()
+
+# Produce a pkg-config file
+configure_file("x265.pc.in" "x265.pc" @ONLY)
+install(FILES       "${CMAKE_CURRENT_BINARY_DIR}/x265.pc"
+        DESTINATION "${LIB_INSTALL_DIR}/pkgconfig")
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
                "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
