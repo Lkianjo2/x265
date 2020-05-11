@@ -720,6 +720,12 @@ if(X265_LATEST_TAG)
             DESTINATION "${LIB_INSTALL_DIR}/pkgconfig")
 endif()
 
+# install shared libraries
+install(TARGETS x265-shared
+                LIBRARY DESTINATION ${LIB_INSTALL_DIR}
+                ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
+                RUNTIME DESTINATION ${BIN_INSTALL_DIR})
+		
 # Produce a pkg-config file
 configure_file("x265.pc.in" "x265.pc" @ONLY)
 install(FILES       "${CMAKE_CURRENT_BINARY_DIR}/x265.pc"
