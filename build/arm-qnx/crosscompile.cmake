@@ -10,6 +10,9 @@ set(CROSS_COMPILE_ARM 1)
 set(CMAKE_SYSTEM_NAME QNX)
 set(CMAKE_SYSTEM_PROCESSOR ARMV7L)
 
+# please apt-get install mingw-w64
+set(CMAKE_RC_COMPILER /usr/bin/x86_64-w64-mingw32-windres)
+
 # specify the cross compiler
 set(CMAKE_C_COMPILER $ENV{QNX_HOST}/usr/bin/arm-unknown-nto-qnx7.0.0eabi-gcc)
 
