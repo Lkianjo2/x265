@@ -673,7 +673,7 @@ if(ENABLE_SHARED)
         endif()
     endif()
     set_target_properties(x265-shared PROPERTIES SOVERSION ${X265_BUILD})
-    if(X265_LATEST_TAG)
+    if(X265_LATEST_TAG OR QNX)
         if(WINDOWS)
             set_target_properties(x265-shared PROPERTIES VERSION ${X265_LATEST_TAG})
         endif()
@@ -719,12 +719,6 @@ if(X265_LATEST_TAG)
     install(FILES       "${CMAKE_CURRENT_BINARY_DIR}/x265.pc"
             DESTINATION "${LIB_INSTALL_DIR}/pkgconfig")
 endif()
-
-# install shared libraries
-install(TARGETS x265-shared
-                LIBRARY DESTINATION ${LIB_INSTALL_DIR}
-                ARCHIVE DESTINATION ${LIB_INSTALL_DIR}
-                RUNTIME DESTINATION ${BIN_INSTALL_DIR})
 		
 # Produce a pkg-config file
 configure_file("x265.pc.in" "x265.pc" @ONLY)
