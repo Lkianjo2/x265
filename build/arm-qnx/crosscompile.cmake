@@ -26,6 +26,7 @@ set(CMAKE_RANLIB $ENV{HOME}/qnx700/host/linux/x86_64/usr/bin/arm-unknown-nto-qnx
 set(CMAKE_AR $ENV{HOME}/qnx700/host/linux/x86_64/usr/bin/arm-unknown-nto-qnx7.0.0eabi-ar
     CACHE PATH "QNX qr Program" FORCE)
 
+set(CMAKE_SYSROOT $ENV{HOME}/qnx700/target/qnx7/armle-v7)
 # specify the target environment
 SET(CMAKE_FIND_ROOT_PATH  $ENV{HOME}/qnx700/target/qnx7/armle-v7)
 
