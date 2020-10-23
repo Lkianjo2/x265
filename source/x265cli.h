@@ -151,7 +151,8 @@ static const struct option long_options[] =
     { "scenecut-aware-qp",    no_argument, NULL, 0 },
     { "no-scenecut-aware-qp", no_argument, NULL, 0 },
     { "scenecut-window",required_argument, NULL, 0 },
-    { "max-qp-delta",   required_argument, NULL, 0 },
+    { "qp-delta-ref",   required_argument, NULL, 0 },
+    { "qp-delta-nonref",required_argument, NULL, 0 },
     { "radl",           required_argument, NULL, 0 },
     { "ctu-info",       required_argument, NULL, 0 },
     { "intra-refresh",        no_argument, NULL, 0 },
@@ -283,6 +284,8 @@ static const struct option long_options[] =
     { "no-multi-pass-opt-analysis",    no_argument, NULL, 0 },
     { "multi-pass-opt-distortion",     no_argument, NULL, 0 },
     { "no-multi-pass-opt-distortion",  no_argument, NULL, 0 },
+    { "vbv-live-multi-pass",           no_argument, NULL, 0 },
+    { "no-vbv-live-multi-pass",        no_argument, NULL, 0 },
     { "slow-firstpass",       no_argument, NULL, 0 },
     { "no-slow-firstpass",    no_argument, NULL, 0 },
     { "multi-pass-opt-rps",   no_argument, NULL, 0 },
@@ -373,12 +376,14 @@ static const struct option long_options[] =
     { "no-cll", no_argument, NULL, 0 },
     { "hme-range", required_argument, NULL, 0 },
     { "abr-ladder", required_argument, NULL, 0 },
+    { "min-vbv-fullness", required_argument, NULL, 0 },
+    { "max-vbv-fullness", required_argument, NULL, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 }
-    };
+};
 
     struct CLIOptions
     {
@@ -401,7 +406,11 @@ static const struct option long_options[] =
         int64_t startTime;
         int64_t prevUpdateTime;
 
+        int argCnt;
+        char** argString;
+
         /* ABR ladder settings */
+        bool isAbrLadderConfig;
         bool enableScaler;
         char*    encName;
         char*    reuseName;
@@ -410,7 +419,6 @@ static const struct option long_options[] =
         uint32_t loadLevel;
         uint32_t saveLevel;
         uint32_t numRefs;
-
 
         /* in microseconds */
         static const int UPDATE_INTERVAL = 250000;
@@ -433,12 +441,16 @@ static const struct option long_options[] =
             startTime = x265_mdate();
             prevUpdateTime = 0;
             bDither = false;
+            isAbrLadderConfig = false;
             enableScaler = false;
+            encName = NULL;
+            reuseName = NULL;
             encId = 0;
             refId = -1;
             loadLevel = 0;
             saveLevel = 0;
             numRefs = 0;
+            argCnt = 0;
         }
 
         void destroy();
@@ -447,6 +459,7 @@ static const struct option long_options[] =
         bool parseZoneParam(int argc, char **argv, x265_param* globalParam, int zonefileCount);
         bool parseQPFile(x265_picture &pic_org);
         bool parseZoneFile();
+        int rpuParser(x265_picture * pic);
     };
 #ifdef __cplusplus
 }

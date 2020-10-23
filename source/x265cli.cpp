@@ -26,6 +26,10 @@
 #endif
 
 #include "x265cli.h"
+#include "svt.h"
+
+#define START_CODE 0x00000001
+#define START_CODE_BYTES 4
 
 #ifdef __cplusplus
 namespace X265_NS {
@@ -123,9 +127,9 @@ namespace X265_NS {
         H0("   --[no-]ssim-rd                Enable ssim rate distortion optimization, 0 to disable. Default %s\n", OPT(param->bSsimRd));
         H0("   --[no-]rd-refine              Enable QP based RD refinement for rd levels 5 and 6. Default %s\n", OPT(param->bEnableRdRefine));
         H0("   --[no-]early-skip             Enable early SKIP detection. Default %s\n", OPT(param->bEnableEarlySkip));
-        H0("   --rskip <mode>                Set mode for early exit from recursion. Mode 1: exit using rdcost. Mode 2: exit using edge density. Mode 3: exit using edge density with forceful skip for small sized CU's."
-            "                                          Mode 0: disabled. Default %s\n", OPT(param->enableRecursionSkip));
-        H1("   --rskip-edge-threshold        Threshold in terms of percentage (integer of range [0,100]) for minimum edge density in CUs to prun the recursion depth. Applicable only for rskip modes 2 and 3. Default: %.f\n", param->edgeVarThreshold*100.0f);
+        H0("   --rskip <mode>                Set mode for early exit from recursion. Mode 1: exit using rdcost & CU homogenity. Mode 2: exit using CU edge density.\n"
+            "                                 Mode 0: disabled. Default %d\n", param->recursionSkipMode);
+        H1("   --rskip-edge-threshold        Threshold in terms of percentage (integer of range [0,100]) for minimum edge density in CUs used to prun the recursion depth. Applicable only for rskip mode 2. Value is preset dependent. Default: %.f\n", param->edgeVarThreshold*100.0f);
         H1("   --[no-]tskip-fast             Enable fast intra transform skipping. Default %s\n", OPT(param->bEnableTSkipFast));
         H1("   --[no-]splitrd-skip           Enable skipping split RD analysis when sum of split CU rdCost larger than one split CU rdCost for Intra CU. Default %s\n", OPT(param->bEnableSplitRdSkip));
         H1("   --nr-intra <integer>          An integer value in range of 0 to 2000, which denotes strength of noise reduction in intra CUs. Default 0\n");
@@ -171,11 +175,12 @@ namespace X265_NS {
         H1("   --scenecut-bias <0..100.0>    Bias for scenecut detection. Default %.2f\n", param->scenecutBias);
         H0("   --hist-scenecut               Enables histogram based scene-cut detection using histogram based algorithm.\n");
         H0("   --no-hist-scenecut            Disables histogram based scene-cut detection using histogram based algorithm.\n");
-        H1("   --hist-threshold <0.0..2.0>   Luma Edge histogram's Normalized SAD threshold for histogram based scenecut detection Default %.2f\n", param->edgeTransitionThreshold);
+        H1("   --hist-threshold <0.0..1.0>   Luma Edge histogram's Normalized SAD threshold for histogram based scenecut detection Default %.2f\n", param->edgeTransitionThreshold);
         H0("   --[no-]fades                  Enable detection and handling of fade-in regions. Default %s\n", OPT(param->bEnableFades));
         H1("   --[no-]scenecut-aware-qp      Enable increasing QP for frames inside the scenecut window after scenecut. Default %s\n", OPT(param->bEnableSceneCutAwareQp));
         H1("   --scenecut-window <0..1000>   QP incremental duration(in milliseconds) when scenecut-aware-qp is enabled. Default %d\n", param->scenecutWindow);
-        H1("   --max-qp-delta <0..10>        QP offset to increment with base QP for inter-frames. Default %d\n", param->maxQpDelta);
+        H1("   --qp-delta-ref <0..10>        QP offset to increment with base QP for inter-frames. Default %f\n", param->refQpDelta);
+        H1("   --qp-delta-nonref <0..10>     QP offset to increment with base QP for non-referenced inter-frames. Default %f\n", param->nonRefQpDelta);
         H0("   --radl <integer>              Number of RADL pictures allowed in front of IDR. Default %d\n", param->radl);
         H0("   --intra-refresh               Use Periodic Intra Refresh instead of IDR frames\n");
         H0("   --rc-lookahead <integer>      Number of frames for frame-type lookahead (determines encoder latency) Default %d\n", param->lookaheadDepth);
@@ -207,6 +212,8 @@ namespace X265_NS {
         H0("   --vbv-bufsize <integer>       Set size of the VBV buffer (kbit). Default %d\n", param->rc.vbvBufferSize);
         H0("   --vbv-init <float>            Initial VBV buffer occupancy (fraction of bufsize or in kbits). Default %.2f\n", param->rc.vbvBufferInit);
         H0("   --vbv-end <float>             Final VBV buffer emptiness (fraction of bufsize or in kbits). Default 0 (disabled)\n");
+        H0("   --min-vbv-fullness <double>   Minimum VBV fullness percentage to be maintained. Default %.2f\n", param->minVbvFullness);
+        H0("   --max-vbv-fullness <double>   Maximum VBV fullness percentage to be maintained. Default %.2f\n", param->maxVbvFullness);
         H0("   --vbv-end-fr-adj <float>      Frame from which qp has to be adjusted to achieve final decode buffer emptiness. Default 0\n");
         H0("   --chunk-start <integer>       First frame of the chunk. Default 0 (disabled)\n");
         H0("   --chunk-end <integer>         Last frame of the chunk. Default 0 (disabled)\n");
@@ -216,6 +223,7 @@ namespace X265_NS {
             "                                   - 3 : Nth pass, overwrites stats file\n");
         H0("   --[no-]multi-pass-opt-analysis   Refine analysis in 2 pass based on analysis information from pass 1\n");
         H0("   --[no-]multi-pass-opt-distortion Use distortion of CTU from pass 1 to refine qp in 2 pass\n");
+        H0("   --[no-]vbv-live-multi-pass    Enable realtime VBV in rate control 2 pass.Default %s\n", OPT(param->bliveVBV2pass));
         H0("   --stats                       Filename for stats file in multipass pass rate control. Default x265_2pass.log\n");
         H0("   --[no-]analyze-src-pics       Motion estimation uses source frame planes. Default disable\n");
         H0("   --[no-]slow-firstpass         Enable a slow first pass in a multipass rate control mode. Default %s\n", OPT(param->rc.bEnableSlowFirstPass));
@@ -291,16 +299,16 @@ namespace X265_NS {
         H0("                                 5=40:33, 6=24:11, 7=20:11, 8=32:11, 9=80:33, 10=18:11, 11=15:11,\n");
         H0("                                 12=64:33, 13=160:99, 14=4:3, 15=3:2, 16=2:1 or custom ratio of <int:int>. Default %d\n", param->vui.aspectRatioIdc);
         H1("   --display-window <string>     Describe overscan cropping region as 'left,top,right,bottom' in pixels\n");
-        H1("   --overscan <string>           Specify whether it is appropriate for decoder to show cropped region: undef, show or crop. Default undef\n");
-        H0("   --videoformat <string>        Specify video format from undef, component, pal, ntsc, secam, mac. Default undef\n");
+        H1("   --overscan <string>           Specify whether it is appropriate for decoder to show cropped region: unknown, show or crop. Default unknown\n");
+        H0("   --videoformat <string>        Specify video format from unknown, component, pal, ntsc, secam, mac. Default unknown\n");
         H0("   --range <string>              Specify black level and range of luma and chroma signals as full or limited Default limited\n");
         H0("   --colorprim <string>          Specify color primaries from  bt709, unknown, reserved, bt470m, bt470bg, smpte170m,\n");
-        H0("                                 smpte240m, film, bt2020, smpte428, smpte431, smpte432. Default undef\n");
+        H0("                                 smpte240m, film, bt2020, smpte428, smpte431, smpte432. Default unknown\n");
         H0("   --transfer <string>           Specify transfer characteristics from bt709, unknown, reserved, bt470m, bt470bg, smpte170m,\n");
         H0("                                 smpte240m, linear, log100, log316, iec61966-2-4, bt1361e, iec61966-2-1,\n");
-        H0("                                 bt2020-10, bt2020-12, smpte2084, smpte428, arib-std-b67. Default undef\n");
-        H1("   --colormatrix <string>        Specify color matrix setting from undef, bt709, fcc, bt470bg, smpte170m,\n");
-        H1("                                 smpte240m, GBR, YCgCo, bt2020nc, bt2020c, smpte2085, chroma-derived-nc, chroma-derived-c, ictcp. Default undef\n");
+        H0("                                 bt2020-10, bt2020-12, smpte2084, smpte428, arib-std-b67. Default unknown\n");
+        H1("   --colormatrix <string>        Specify color matrix setting from unknown, bt709, fcc, bt470bg, smpte170m,\n");
+        H1("                                 smpte240m, gbr, ycgco, bt2020nc, bt2020c, smpte2085, chroma-derived-nc, chroma-derived-c, ictcp. Default unknown\n");
         H1("   --chromaloc <integer>         Specify chroma sample location (0 to 5). Default of %d\n", param->vui.chromaSampleLocTypeTopField);
         H0("   --master-display <string>     SMPTE ST 2086 master display color volume info SEI (HDR)\n");
         H0("                                    format: G(x,y)B(x,y)R(x,y)WP(x,y)L(max,min)\n");
@@ -367,6 +375,13 @@ namespace X265_NS {
 
     void CLIOptions::destroy()
     {
+        if (isAbrLadderConfig)
+        {
+            for (int idx = 1; idx < argCnt; idx++)
+                free(argString[idx]);
+            free(argString);
+        }
+
         if (input)
             input->release();
         input = NULL;
@@ -532,6 +547,8 @@ namespace X265_NS {
         const char *tune = NULL;
         const char *profile = NULL;
         int svtEnabled = 0;
+        argCnt = argc;
+        argString = argv;
 
         if (argc <= 1)
         {
@@ -990,6 +1007,58 @@ namespace X265_NS {
             }
         }
         return 1;
+    }
+
+    /* Parse the RPU file and extract the RPU corresponding to the current picture
+    * and fill the rpu field of the input picture */
+    int CLIOptions::rpuParser(x265_picture * pic)
+    {
+        uint8_t byteVal;
+        uint32_t code = 0;
+        int bytesRead = 0;
+        pic->rpu.payloadSize = 0;
+
+        if (!pic->pts)
+        {
+            while (bytesRead++ < 4 && fread(&byteVal, sizeof(uint8_t), 1, dolbyVisionRpu))
+                code = (code << 8) | byteVal;
+
+            if (code != START_CODE)
+            {
+                x265_log(NULL, X265_LOG_ERROR, "Invalid Dolby Vision RPU startcode in POC %d\n", pic->pts);
+                return 1;
+            }
+        }
+
+        bytesRead = 0;
+        while (fread(&byteVal, sizeof(uint8_t), 1, dolbyVisionRpu))
+        {
+            code = (code << 8) | byteVal;
+            if (bytesRead++ < 3)
+                continue;
+            if (bytesRead >= 1024)
+            {
+                x265_log(NULL, X265_LOG_ERROR, "Invalid Dolby Vision RPU size in POC %d\n", pic->pts);
+                return 1;
+            }
+
+            if (code != START_CODE)
+                pic->rpu.payload[pic->rpu.payloadSize++] = (code >> (3 * 8)) & 0xFF;
+            else
+                return 0;
+        }
+
+        int ShiftBytes = START_CODE_BYTES - (bytesRead - pic->rpu.payloadSize);
+        int bytesLeft = bytesRead - pic->rpu.payloadSize;
+        code = (code << ShiftBytes * 8);
+        for (int i = 0; i < bytesLeft; i++)
+        {
+            pic->rpu.payload[pic->rpu.payloadSize++] = (code >> (3 * 8)) & 0xFF;
+            code = (code << 8);
+        }
+        if (!pic->rpu.payloadSize)
+            x265_log(NULL, X265_LOG_WARNING, "Dolby Vision RPU not found for POC %d\n", pic->pts);
+        return 0;
     }
 
 #ifdef __cplusplus
